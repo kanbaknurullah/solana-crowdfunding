@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {Fragment, useEffect, useState} from 'react';
 import idl from "./idl.json";
 import { Connection, PublicKey, clusterApiUrl } from '@solana/web3.js';
 import {Program, AnchorProvider, web3, utils} from '@project-serum/anchor';
@@ -15,6 +15,7 @@ const {SystemProgram} = web3;
 
 const App = () => {
   const [walletAddress, setWalletAddress] = useState(null);
+  const [campaigns, setCampaigns] = useState([]);
   const getProvider = () => {
     const connection = new Connection(network, opts.preflightCommitment);
     const provider = new AnchorProvider(connection, window.solana, opts.preflightCommitment);
@@ -46,6 +47,16 @@ const App = () => {
     }
   };
 
+  const getCampaigns = async() => {
+    const connection = new Connection(network, opts.preflightCommitment);
+    const provider = getProvider();
+    const program = new Program(idl, programID, provider);
+    Promise.all((await connection.getProgramAccounts(programID)).map(async campaign => ({
+      ...(await program.account.campaign.fetch(campaign.pubkey)),
+      pubkey: campaign.pubkey
+    }))).then(campaigns => setCampaigns(campaigns));
+  }
+
   const createCampaign = async() => {
     try {
       const provider = getProvider();
@@ -71,7 +82,20 @@ const App = () => {
     <button onClick={connectWallet}>Connect to Wallet</button>
   )
   const renderConnectedContainer = () => (
-    <button onClick={createCampaign}>Create a campaign...</button>
+    <>
+      <button onClick={createCampaign}>Create a campaign...</button>
+      <button onClick={getCampaigns}>Get Campaigns</button>
+      <br />
+      {campaigns.map(campaign => (
+        <Fragment key={campaign.pubkey}>
+          <p>Campaign ID: {campaign.pubkey.toString()}</p>
+          <p>Balance: {(campaign.amountDonated / web3.LAMPORTS_PER_SOL).toString()}</p>
+          <p>{campaign.name}</p>
+          <p>{campaign.description}</p>
+          <br />
+        </Fragment>
+      ))}
+    </>
   )
   useEffect(() => {
     const onLoad = async() => {
